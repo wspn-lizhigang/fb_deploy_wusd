@@ -103,11 +103,13 @@ export class FireblocksConnectionAdapter extends Connection {
         config.apiSecretPath,
         "utf-8"
       );
+      // console.log("Fireblocks Secret Key:", fireblocksSecretKey);
+      // console.log("apiKey:", config.apiKey); 
       const fireblocksClient = new FireblocksSDK(
         fireblocksSecretKey,
         config.apiKey,
-        API_BASE_URLS.SANDBOX
-      ); 
+        API_BASE_URLS.PRODUCTION
+      );
 
       const environment = endpoint.split(".")[1];
       config.devnet = environment === "devnet" || environment === "testnet";
@@ -117,8 +119,8 @@ export class FireblocksConnectionAdapter extends Connection {
         endpoint,
         config,
         commitment
-      );
-
+      ); 
+     
       await adapter.setAccount(config.vaultAccountId, config.devnet);
       adapter.setExternalTxId(null);
 
@@ -170,7 +172,7 @@ export class FireblocksConnectionAdapter extends Connection {
       const solWallet = await this.fireblocksApiClient.getDepositAddresses(
         String(vaultAccount),
         devnet ? ASSET_IDS.SOLANA_DEVNET : ASSET_IDS.SOLANA_MAINNET
-      );
+      ); 
 
       if (!solWallet?.[0]?.address) {
         throw new Error("No wallet address found");
@@ -204,21 +206,47 @@ export class FireblocksConnectionAdapter extends Connection {
         throw new Error("Transaction is required");
       }
 
+      // 验证交易对象的基本属性
+      if (transaction instanceof Transaction) {
+        if (!transaction.feePayer) {
+          throw new Error("Transaction fee payer is required");
+        }
+        if (!transaction.recentBlockhash) {
+          throw new Error("Transaction recent blockhash is required");
+        }
+        if (!transaction.feePayer.equals(new PublicKey(this.account))) {
+          throw new Error("Transaction fee payer must match the Fireblocks account");
+        }
+      } else {
+        if (!transaction.message.recentBlockhash) {
+          throw new Error("Transaction recent blockhash is required");
+        }
+        if (!transaction.message.staticAccountKeys[0].equals(new PublicKey(this.account))) {
+          throw new Error("Transaction fee payer must match the Fireblocks account");
+        }
+      }
+
       const serializedTx = transaction.serialize({
         requireAllSignatures: false,
+        verifySignatures: false
       });
 
       const payload: TransactionArguments = {
         assetId: this.assetId,
-        operation: "PROGRAM_CALL" as TransactionOperation,
+        operation: "CONTRACT_CALL" as TransactionOperation, // 使用有效的操作类型
         feeLevel: this.feeLevel,
         source: {
           type: PeerType.VAULT_ACCOUNT,
           id: String(this.adapterConfig.vaultAccountId),
         },
+        destination: {
+          type: PeerType.ONE_TIME_ADDRESS,
+          id: "", // Empty string for ONE_TIME_ADDRESS type
+          oneTimeAddress: { address: this.account }
+        },
         note: this.txNote || "Created by Solana Web3 Adapter",
         extraParameters: {
-          programCallData: Buffer.from(serializedTx).toString("base64"),
+          contractCallData: Buffer.from(serializedTx).toString("base64"), // 使用contractCallData而不是programCallData
         },
       };
 
@@ -237,9 +265,27 @@ export class FireblocksConnectionAdapter extends Connection {
 
       return tx;
     } catch (error) {
-      throw new Error(
-        `Failed to sign transaction with Fireblocks: ${error.message}`
-      );
+      // 提供更详细的错误信息
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const statusCode = (error as any).response?.status;
+      const statusText = (error as any).response?.statusText;
+      const responseData = (error as any).response?.data;
+      
+      this.logger.error("Transaction signing failed", error as Error, {
+        statusCode,
+        statusText,
+        responseData
+      });
+      
+      if (statusCode) {
+        throw new Error(
+          `Failed to sign transaction with Fireblocks: ${errorMessage} (Status: ${statusCode} ${statusText || ''})`
+        );
+      } else {
+        throw new Error(
+          `Failed to sign transaction with Fireblocks: ${errorMessage}`
+        );
+      }
     }
   }
 
@@ -342,7 +388,22 @@ export class FireblocksConnectionAdapter extends Connection {
   protected async createFireblocksTransaction(
     payload: TransactionArguments
   ): Promise<CreateTransactionResponse> {
-    return this.fireblocksApiClient.createTransaction(payload);
+    try {
+      this.logger.debug("Calling Fireblocks API with payload", { 
+        assetId: payload.assetId,
+        operation: payload.operation,
+        source: payload.source
+      });
+      const response = await this.fireblocksApiClient.createTransaction(payload);
+      return response;
+    } catch (error) {
+      this.logger.error("Fireblocks API error", error as Error, {
+        statusCode: (error as any).response?.status,
+        statusText: (error as any).response?.statusText,
+        data: (error as any).response?.data
+      });
+      throw error;
+    }
   }
 
   protected async getBlockhash(): Promise<string> {

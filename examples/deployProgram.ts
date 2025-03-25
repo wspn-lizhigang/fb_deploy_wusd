@@ -52,7 +52,7 @@ async function deployProgram() {
   // Note: You need to compile your Solana program using the Solana CLI before running this script
   // Example: solana-test-validator
   // In another terminal: cargo build-bpf --manifest-path=./path/to/program/Cargo.toml
-  const programPath = "../deploy/wusd_token.so";
+  const programPath = "./deploy/wusd_token.so";
 
   // For this example, we'll check if the file exists
   if (!fs.existsSync(programPath)) {
@@ -91,6 +91,8 @@ async function deployProgram() {
 
     // 1. Create program account
     const createAccountTransaction = new Transaction();
+    createAccountTransaction.feePayer = payerPublicKey;
+    createAccountTransaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
     createAccountTransaction.add(
       SystemProgram.createAccount({
         fromPubkey: payerPublicKey,
@@ -105,6 +107,10 @@ async function deployProgram() {
     // Note: We need to sign with both the payer and the program keypair
     // Since Fireblocks can only sign with the payer, we'll use partialSign for the program keypair
     createAccountTransaction.partialSign(programKeypair);
+    
+    // Serialize the transaction with verifySignatures set to false
+    const serializedTx = createAccountTransaction.serialize({verifySignatures: false});
+    console.log("Serialized transaction:", serializedTx.toString("base64"));
 
     const createAccountTxHash = await sendAndConfirmTransaction(
       connection,
@@ -124,6 +130,8 @@ async function deployProgram() {
       const chunk = programData.slice(offset, offset + chunkSize);
 
       const writeTransaction = new Transaction();
+      writeTransaction.feePayer = payerPublicKey;
+      writeTransaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
       // BpfLoader.write 方法不存在，需要创建自定义指令
       const dataLayout = Buffer.alloc(4 + 4 + chunk.length);
       dataLayout.writeUInt32LE(0, 0); // 写入指令 (0 = Load)
@@ -137,6 +145,9 @@ async function deployProgram() {
         programId: BPF_LOADER_PROGRAM_ID,
         data: dataLayout
       }));
+
+      // Sign with program keypair since it's a required signer
+      writeTransaction.partialSign(programKeypair);
 
       const writeTxHash = await sendAndConfirmTransaction(
         connection,
@@ -152,6 +163,8 @@ async function deployProgram() {
 
     // 3. Finalize the program
     const finalizeTransaction = new Transaction();
+    finalizeTransaction.feePayer = payerPublicKey;
+    finalizeTransaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
     // BpfLoader.finalize 方法不存在，需要创建自定义指令
     const finalizeData = Buffer.alloc(4);
     finalizeData.writeUInt32LE(1, 0); // 写入指令 (1 = Finalize)
@@ -164,6 +177,9 @@ async function deployProgram() {
       programId: BPF_LOADER_PROGRAM_ID,
       data: finalizeData
     }));
+
+    // Sign with program keypair since it's a required signer
+    finalizeTransaction.partialSign(programKeypair);
 
     const finalizeTxHash = await sendAndConfirmTransaction(
       connection,
