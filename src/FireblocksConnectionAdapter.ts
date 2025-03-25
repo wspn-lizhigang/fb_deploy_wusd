@@ -241,7 +241,6 @@ export class FireblocksConnectionAdapter extends Connection {
         },
         destination: {
           type: PeerType.ONE_TIME_ADDRESS,
-          id: "", // Empty string for ONE_TIME_ADDRESS type
           oneTimeAddress: { address: this.account }
         },
         note: this.txNote || "Created by Solana Web3 Adapter",
