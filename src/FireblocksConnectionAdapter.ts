@@ -233,19 +233,14 @@ export class FireblocksConnectionAdapter extends Connection {
 
       const payload: TransactionArguments = {
         assetId: this.assetId,
-        operation: "CONTRACT_CALL" as TransactionOperation, // 使用有效的操作类型
-        feeLevel: this.feeLevel,
+        operation: "PROGRAM_CALL" as TransactionOperation, // 使用有效的操作类型
         source: {
           type: PeerType.VAULT_ACCOUNT,
           id: String(this.adapterConfig.vaultAccountId),
-        },
-        destination: {
-          type: PeerType.ONE_TIME_ADDRESS,
-          oneTimeAddress: { address: this.account }
-        },
+        }, 
         note: this.txNote || "Created by Solana Web3 Adapter",
         extraParameters: {
-          contractCallData: Buffer.from(serializedTx).toString("base64"), // 使用contractCallData而不是programCallData
+          programCallData: Buffer.from(serializedTx).toString("base64"), // 使用contractCallData而不是programCallData
         },
       };
 
