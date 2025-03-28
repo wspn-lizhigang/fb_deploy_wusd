@@ -13,7 +13,7 @@ import {
   FireblocksConnectionAdapter,
   FireblocksConnectionAdapterConfig,
   FeeLevel,
-} from "../src/index";
+} from "../fireblocks/index";
 import fs from "fs";
 
 require("dotenv").config();

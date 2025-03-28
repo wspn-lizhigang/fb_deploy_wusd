@@ -1,106 +1,96 @@
-## Introduction
+# Solana Web3.js Fireblocks Provider
 
-The Fireblocks Solana Web3 Connection Adapter facilitates interactions between the Fireblocks API and the Solana blockchain, simplifying the process of sending transactions through Fireblocks by handling complex authentication and transaction signing procedures.
+一个与Fireblocks兼容的Solana Web3.js提供程序，支持代币铸造和程序部署等功能。
 
-The Solana Web3 Connection Adapter utilizes Fireblocks Program Call API to process and sign all transactions, providing a seamless integration with the Solana blockchain.
+## 功能特点
 
-> **Note**: This Web3 Connection Adapter is currently in Beta. We welcome your feedback and pull requests to help improve the package!
+- 与Fireblocks完全集成的Solana Web3.js提供程序
+- 支持代币铸造和程序部署
+- 高度可配置的连接适配器
+- 内置的交易状态轮询和重试机制
+- 支持devnet和mainnet环境
 
-> **Important**: The Program Call API is currently in Early Availability. Please contact your Customer Success Manager (CSM) to enable this feature for your workspace.
-
-
-## Installation
-
-Clone the repository and install dependencies:
+## 安装
 
 ```bash
-git clone https://github.com/fireblocks/solana-web3-provider.git
-cd solana-web3-provider
 npm install -g typescript ts-node
 npm install
 ```
 
-## Configuration
+## 配置
 
-Configure the adapter with your Fireblocks API credentials and Solana connection details (See .env.example for reference):
+在使用之前，需要设置以下环境变量：
 
-```js
-import { FireblocksConnectionAdapter } from './path_to_adapter';
+```env
+FIREBLOCKS_API_KEY=your_api_key
+FIREBLOCKS_SECRET_KEY_PATH=path_to_your_secret_key
+FIREBLOCKS_VAULT_ACCOUNT_ID=your_vault_account_id
+```
 
-const config = {
+## 使用示例
+
+### 初始化连接
+
+```typescript
+import { FireblocksConnectionAdapter, FireblocksConnectionAdapterConfig, FeeLevel } from 'solana_fireblocks_web3_provider';
+import { clusterApiUrl } from '@solana/web3.js';
+
+const config: FireblocksConnectionAdapterConfig = {
   apiKey: process.env.FIREBLOCKS_API_KEY,
   apiSecretPath: process.env.FIREBLOCKS_SECRET_KEY_PATH,
-  vaultAccountId: process.env.FIREBLOCKS_VAULT_ACCOUNT_ID
+  vaultAccountId: process.env.FIREBLOCKS_VAULT_ACCOUNT_ID,
+  feeLevel: FeeLevel.HIGH,
+  silent: false,
+  devnet: true
 };
 
-const solanaEndpoint = 'https://api.devnet.solana.com'; // Use appropriate Solana RPC endpoint
-
-```
-
-## Usage
-
-Creating an Adapter Instance:
-
-```js
-const connection = await FireblocksConnectionAdapter.create(solanaEndpoint, config);
-```
-
-Sending a Transaction:
-
-```js
-const { Transaction, SystemProgram, sendAndConfirmTransaction} = require('@solana/web3.js');
-
-const fromMyAccount = new PublicKey(connection.getAccount());
-
-let transaction = new Transaction().add(
-  SystemProgram.transfer({
-    fromPubkey: fromMyAccount,
-    toPubkey: new PublicKey('destination_address'),
-    lamports: 1000
-  })
+const connection = await FireblocksConnectionAdapter.create(
+  clusterApiUrl('devnet'),
+  config
 );
-
-const txHash = await connection.sendTransaction(transaction);
-// OR
-const txHash = await sendAndConfirmTransaction(connection, transaction, []);
-
-console.log('Transaction sent with hash:', txHash);
 ```
 
-## Examples
+### 铸造代币
 
-See the [examples](https://github.com/fireblocks/solana-web3-provider/tree/main/examples) directory in this repository for more detailed examples.
+项目提供了一个完整的代币铸造脚本，可以通过以下命令运行：
 
-
-## Connection Configuration
-```js
- apiKey: string - Your Fireblocks API Key
- apiSecretPath: string - Path to your Fireblocks API Secret Key
- apiBaseUrl?: ApiBaseUrl | string - Base URL for the Fireblocks API (optional, defaults to US production environment)
- vaultAccountId: string | number - The ID of the vault account to use for transactions
- devnet?: boolean - Whether to use the Devnet environment (optional, defaults to false)
- pollingInterval?: number - Fireblocks API polling interval for tx status updates
- feeLevel?: FeeLevel - Fee level to use for transactions (optional, defaults to MEDIUM)
- silent?: boolean - Whether to suppress logging (optional, defaults to false)
+```bash
+npm run mint
 ```
 
+这将：
+- 创建一个新的代币铸造账户
+- 初始化代币铸造
+- 创建代币账户
+- 铸造指定数量的代币
 
-## Extended methods
+### 部署程序
 
-Fireblocks Solana Web3 Connection Adapter introduces a few extended methods for better user experience:
+可以使用以下命令部署Solana程序：
 
-Set a transaction note:
-```js
-connection.setTxNote(txNote: string)
+```bash
+npm run deploy
 ```
 
+## API参考
 
-Set an external transaction identifier:
-```js
-connection.setExternalTxId(externalTxId: string | null)
-```
+### FireblocksConnectionAdapter
 
-Get the address of the current account (the address of the SOL/SOL_TEST wallet in the configured vault account):
-```js
-connection.getAccount() 
-```
+主要的连接适配器类，提供以下配置选项：
+
+- `apiKey`: Fireblocks API密钥
+- `apiSecretPath`: Fireblocks密钥文件路径
+- `vaultAccountId`: Fireblocks保管库账户ID
+- `feeLevel`: 交易费用级别（LOW/MEDIUM/HIGH）
+- `silent`: 是否禁用日志输出
+- `devnet`: 是否使用devnet环境
+
+### 辅助函数
+
+- `waitForSignature`: 等待交易签名完成，包含自动重试机制
+
+## 注意事项
+
+- 确保Fireblocks API密钥具有足够的权限
+- 在mainnet环境中使用时，建议先在devnet上进行测试
+- 保管好密钥文件，不要将其提交到版本控制系统

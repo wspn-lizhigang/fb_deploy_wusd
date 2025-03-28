@@ -10,6 +10,6 @@
     "outDir": "./dist",
     "declaration": true
   },
-  "include": ["src/**/*"],
+  "include": ["fireblocks/**/*"],
   "exclude": ["node_modules", "dist"]
 }
