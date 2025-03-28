@@ -52,7 +52,7 @@ async function deployProgram() {
   // Note: You need to compile your Solana program using the Solana CLI before running this script
   // Example: solana-test-validator
   // In another terminal: cargo build-bpf --manifest-path=./path/to/program/Cargo.toml
-  const programPath = "./deploy/wusd_token.so";
+  const programPath = process.env.FIREBLOCKS_DEPLOY_FILE || "";
 
   // For this example, we'll check if the file exists
   if (!fs.existsSync(programPath)) {
