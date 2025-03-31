@@ -122,44 +122,62 @@ async function deployProgram() {
     );
 
     // 2. Write program data in chunks
-    // BPF programs can be large, so we need to write them in chunks
-    const chunkSize = 900; // Solana has a limit on transaction size
-    let offset = 0;
-
-    while (offset < programData.length) {
+    console.log("Writing program data in chunks...");
+    
+    // Solana transaction has size limitations, use smaller chunks
+    const chunkSize = 800; // Smaller chunk size to avoid buffer issues
+    const totalChunks = Math.ceil(programData.length / chunkSize);
+    let chunkTxHash = ''; // Declare variable outside loop
+    
+    for (let i = 0; i < totalChunks; i++) {
+      const offset = i * chunkSize;
       const chunk = programData.slice(offset, offset + chunkSize);
-
-      const writeTransaction = new Transaction();
-      writeTransaction.feePayer = payerPublicKey;
-      writeTransaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-      // BpfLoader.write 方法不存在，需要创建自定义指令
-      const dataLayout = Buffer.alloc(4 + 4 + chunk.length);
-      dataLayout.writeUInt32LE(0, 0); // 写入指令 (0 = Load)
-      dataLayout.writeUInt32LE(offset, 4); // 写入偏移量
-      chunk.copy(dataLayout, 8); // 复制数据块
       
-      writeTransaction.add(new TransactionInstruction({
+      console.log(`Writing chunk ${i+1}/${totalChunks} (${chunk.length} bytes)...`);
+      
+      const chunkTransaction = new Transaction();
+      chunkTransaction.feePayer = payerPublicKey;
+      chunkTransaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+      
+      // Create buffer with exact size needed
+      const chunkDataLayout = Buffer.alloc(8 + chunk.length);
+      chunkDataLayout.writeUInt32LE(0, 0); // Instruction (0 = Load)
+      // Use BigInt for large offsets to avoid overflow
+      const offsetValue = offset > 0x7FFFFFFF ? BigInt(offset) : BigInt(offset);
+      chunkDataLayout.writeUInt32LE(Number(offsetValue & 0xFFFFFFFFn), 4); // Offset (handle large values)
+      chunk.copy(chunkDataLayout, 8); // Copy chunk data
+      
+      chunkTransaction.add(new TransactionInstruction({
         keys: [
           {pubkey: programKeypair.publicKey, isSigner: true, isWritable: true}
         ],
         programId: BPF_LOADER_PROGRAM_ID,
-        data: dataLayout
+        data: chunkDataLayout
       }));
-
-      // Sign with program keypair since it's a required signer
-      writeTransaction.partialSign(programKeypair);
-
-      const writeTxHash = await sendAndConfirmTransaction(
-        connection,
-        writeTransaction,
-        [] // Empty array since Fireblocks will handle the payer signature
-      );
-
-      console.log(
-        `Wrote chunk at offset ${offset}: https://explorer.solana.com/tx/${writeTxHash}?cluster=devnet`
-      );
-      offset += chunkSize;
+      
+      try {
+        console.log('Signing chunk transaction...');
+        chunkTransaction.partialSign(programKeypair);
+        
+        const chunkTxHash = await sendAndConfirmTransaction(
+          connection,
+          chunkTransaction,
+          [] // Empty array since Fireblocks will handle the payer signature
+        );
+        
+        console.log(
+          `Chunk ${i+1}/${totalChunks} written: https://explorer.solana.com/tx/${chunkTxHash}?cluster=devnet`
+        );
+      } catch (chunkError) {
+        console.error(`Error writing chunk ${i+1}:`, chunkError);
+        throw chunkError;
+      }
     }
+    
+    const writeTxHash = chunkTxHash; // Use last chunk's hash as the writeTxHash
+    console.log(
+      `Wrote entire program data: https://explorer.solana.com/tx/${writeTxHash}?cluster=devnet`
+    );
 
     // 3. Finalize the program
     const finalizeTransaction = new Transaction();
@@ -179,13 +197,21 @@ async function deployProgram() {
     }));
 
     // Sign with program keypair since it's a required signer
-    finalizeTransaction.partialSign(programKeypair);
-
-    const finalizeTxHash = await sendAndConfirmTransaction(
-      connection,
-      finalizeTransaction,
-      [] // Empty array since Fireblocks will handle the payer signature
-    );
+    let finalizeTxHash;
+    try {
+      console.log('Signing finalize transaction...');
+      finalizeTransaction.partialSign(programKeypair);
+      console.log('Finalize transaction signed successfully');
+      
+      finalizeTxHash = await sendAndConfirmTransaction(
+        connection,
+        finalizeTransaction,
+        [] // Empty array since Fireblocks will handle the payer signature
+      );
+    } catch (finalizeSignError) {
+      console.error('Error signing finalize transaction:', finalizeSignError);
+      throw finalizeSignError;
+    }
 
     console.log(
       `Program finalized: https://explorer.solana.com/tx/${finalizeTxHash}?cluster=devnet`
