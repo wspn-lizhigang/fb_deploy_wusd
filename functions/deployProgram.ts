@@ -1,5 +1,4 @@
 import { 
-  BPF_LOADER_PROGRAM_ID,
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
@@ -9,6 +8,9 @@ import {
   SystemProgram,
   TransactionInstruction
 } from "@solana/web3.js";
+
+// LoaderV4 is now the standard program loader
+const LOADER_V4_PROGRAM_ID = new PublicKey('LoaderV411111111111111111111111111111111111');
 import {
   FireblocksConnectionAdapter,
   FireblocksConnectionAdapterConfig,
@@ -99,7 +101,7 @@ async function deployProgram() {
         newAccountPubkey: programKeypair.publicKey,
         lamports: minimumBalanceForRentExemption,
         space: programData.length,
-        programId: BPF_LOADER_PROGRAM_ID,
+        programId: LOADER_V4_PROGRAM_ID,
       })
     );
 
@@ -124,35 +126,42 @@ async function deployProgram() {
     // 2. Write program data in chunks
     console.log("Writing program data in chunks...");
     
-    // Solana transaction has size limitations, use smaller chunks
-    const chunkSize = 800; // Smaller chunk size to avoid buffer issues
+    // 设置合适的分块大小以确保不超过交易大小限制
+    const chunkSize = 800; // 设置为800字节，确保交易大小不超过1232字节限制
     const totalChunks = Math.ceil(programData.length / chunkSize);
+    
+    console.log(`Total chunks needed: ${totalChunks}`);
     let chunkTxHash = ''; // Declare variable outside loop
     
     for (let i = 0; i < totalChunks; i++) {
       const offset = i * chunkSize;
       const chunk = programData.slice(offset, offset + chunkSize);
       
-      console.log(`Writing chunk ${i+1}/${totalChunks} (${chunk.length} bytes)...`);
+      console.log(`Writing chunk ${i+1}/${totalChunks} (${chunk.length} bytes) at offset ${offset}...`);
       
       const chunkTransaction = new Transaction();
       chunkTransaction.feePayer = payerPublicKey;
       chunkTransaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
       
-      // Create buffer with exact size needed
-      const chunkDataLayout = Buffer.alloc(8 + chunk.length);
-      chunkDataLayout.writeUInt32LE(0, 0); // Instruction (0 = Load)
-      // Use BigInt for large offsets to avoid overflow
-      const offsetValue = offset > 0x7FFFFFFF ? BigInt(offset) : BigInt(offset);
-      chunkDataLayout.writeUInt32LE(Number(offsetValue & 0xFFFFFFFFn), 4); // Offset (handle large values)
-      chunk.copy(chunkDataLayout, 8); // Copy chunk data
+      // 优化指令数据结构
+      const instructionData = Buffer.concat([
+        Buffer.from([0]), // Instruction (0 = Load)
+        Buffer.from(new Uint32Array([offset]).buffer), // Write offset as 4 bytes
+        chunk // Chunk data
+      ]);
+      
+      // 验证交易大小
+      const estimatedSize = instructionData.length + 100; // 100字节作为交易元数据的预估值
+      if (estimatedSize > 1232) {
+        throw new Error(`Transaction size too large: ${estimatedSize} > 1232`);
+      }
       
       chunkTransaction.add(new TransactionInstruction({
+        programId: LOADER_V4_PROGRAM_ID,
         keys: [
           {pubkey: programKeypair.publicKey, isSigner: true, isWritable: true}
         ],
-        programId: BPF_LOADER_PROGRAM_ID,
-        data: chunkDataLayout
+        data: instructionData
       }));
       
       try {
@@ -192,7 +201,7 @@ async function deployProgram() {
         {pubkey: programKeypair.publicKey, isSigner: true, isWritable: true},
         {pubkey: new PublicKey('SysvarRent111111111111111111111111111111111'), isSigner: false, isWritable: false}
       ],
-      programId: BPF_LOADER_PROGRAM_ID,
+      programId: LOADER_V4_PROGRAM_ID,
       data: finalizeData
     }));
 

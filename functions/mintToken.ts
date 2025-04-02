@@ -17,7 +17,7 @@ import {
   mintTo,
   TOKEN_PROGRAM_ID,
   MINT_SIZE,
-  getMinimumBalanceForRentExemption,
+  getMinimumBalanceForRentExemptMint,
 } from "@solana/spl-token";
 import fs from "fs";
 
@@ -60,9 +60,8 @@ async function mintToken() {
     console.log("Mint account:", mintKeypair.publicKey.toBase58());
 
     // Calculate the rent for the mint account
-    const mintRent = await getMinimumBalanceForRentExemption(
-      connection,
-      MINT_SIZE
+    const mintRent = await getMinimumBalanceForRentExemptMint(
+      connection
     );
 
     // Create a transaction to create the mint account
@@ -109,9 +108,9 @@ async function mintToken() {
       null, // We'll sign with Fireblocks
       mintKeypair.publicKey,
       payerPublicKey, // Mint authority
-      payerPublicKey, // Freeze authority (optional)
+      null, // Freeze authority (optional) - null instead of PublicKey
       decimals,
-      mintKeypair,
+      mintKeypair, // Provide the keypair
       { commitment: 'confirmed' }
     );
 
