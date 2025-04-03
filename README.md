@@ -49,13 +49,20 @@ const connection = await FireblocksConnectionAdapter.create(
   config
 );
 ```
+### 部署程序
+
+可以使用以下命令部署Solana程序：
+
+```bash
+yarn deploy
+```
 
 ### 铸造代币
 
 项目提供了一个完整的代币铸造脚本，可以通过以下命令运行：
 
 ```bash
-npm run mint
+yarn mint
 ```
 
 这将：
@@ -63,14 +70,6 @@ npm run mint
 - 初始化代币铸造
 - 创建代币账户
 - 铸造指定数量的代币
-
-### 部署程序
-
-可以使用以下命令部署Solana程序：
-
-```bash
-npm run deploy
-```
 
 ## API参考
 
