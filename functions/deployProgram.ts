@@ -138,35 +138,31 @@ async function deployProgram() {
     // 2. Write program data in chunks
     console.log("Writing program data in chunks...");
 
-    // 计算最佳分块大小，确保不超过交易大小限制
+    // Calculate optimal chunk size to ensure it doesn't exceed transaction size limit
     const calculateOptimalChunkSize = (dataLength: number) => {
-      // 交易大小限制为1232字节
+      // Transaction size limit is 1232 bytes
       const MAX_TRANSACTION_SIZE = 1232;
-      // 预估交易元数据大小（包括签名、头部等）
-      // 增加元数据大小预估值，为安全起见
-      const TRANSACTION_METADATA_SIZE = 400; // 增加到400以提供更多安全余量
-      // 指令头部大小（指令类型1字节 + 偏移量4字节）
+      // Estimated transaction metadata size (including signatures, headers, etc.)
+      // Increased metadata size estimate for safety
+      const TRANSACTION_METADATA_SIZE = 400; // Increased to 400 to provide more safety margin
+      // Instruction header size (instruction type 1 byte + offset 4 bytes)
       const INSTRUCTION_HEADER_SIZE = 5;
-      // 额外的安全余量
-      const SAFETY_MARGIN = 150; // 增加安全余量
+      // Additional safety margin
+      const SAFETY_MARGIN = 150; // Increased safety margin
       
-      // 计算可用于数据的最大字节数
+      // Calculate maximum bytes available for data
       const maxDataSize = MAX_TRANSACTION_SIZE - TRANSACTION_METADATA_SIZE - INSTRUCTION_HEADER_SIZE - SAFETY_MARGIN;
       
-      // 设置一个非常保守的初始分块大小
-      let chunkSize = Math.min(maxDataSize, 600); // 减小到600字节
+      // Set a very conservative initial chunk size
+      let chunkSize = Math.min(maxDataSize, 600); // Reduced to 600 bytes
       
-      // 计算使用当前分块大小的总块数
-      let totalChunks = Math.ceil(dataLength / chunkSize);
-      
-      console.log(`计算得出的最大安全数据大小: ${maxDataSize} 字节`);
-      console.log(`设置的分块大小: ${chunkSize} 字节`);
-      console.log(`预计总块数: ${totalChunks}`);
+      // Calculate total chunks needed with current chunk size
+      let totalChunks = Math.ceil(dataLength / chunkSize); 
       
       return { chunkSize, totalChunks };
     };
     
-    // 动态计算最佳分块大小
+    // Dynamically calculate optimal chunk size
     const { chunkSize, totalChunks } = calculateOptimalChunkSize(programData.length);
     
     console.log(`Optimal chunk size: ${chunkSize} bytes`);
@@ -187,7 +183,7 @@ async function deployProgram() {
         await connection.getLatestBlockhash()
       ).blockhash;
 
-      // 优化指令数据结构 - 使用let声明以便后续可能的修改
+      // Optimize instruction data structure - use let declaration for possible later modifications
       let currentChunk = chunk;
       let instructionData = Buffer.concat([
         Buffer.from([0]), // Instruction (0 = Load)
@@ -195,36 +191,36 @@ async function deployProgram() {
         currentChunk, // Chunk data
       ]);
 
-      // 验证交易大小
-      let estimatedSize = instructionData.length + 300; // 增加元数据预估值以确保安全
+      // Validate transaction size
+      let estimatedSize = instructionData.length + 300; // Increase metadata estimate to ensure safety
       
-      // 如果估计大小超过限制，逐步减小当前块直到满足大小要求
+      // If estimated size exceeds limit, gradually reduce current chunk until size requirement is met
       while (estimatedSize > 1232) {
-        console.error(`警告：估计的交易大小(${estimatedSize})接近限制(1232)，尝试减小分块大小`);
-        // 每次减少10%的大小
+        console.error(`Warning: Estimated transaction size (${estimatedSize}) approaching limit (1232), attempting to reduce chunk size`);
+        // Reduce size by 10% each time
         currentChunk = currentChunk.slice(0, Math.floor(currentChunk.length * 0.9));
-        console.log(`减小当前块大小至 ${currentChunk.length} 字节并重试`);
+        console.log(`Reducing current chunk size to ${currentChunk.length} bytes and retrying`);
         
-        // 更新指令数据
+        // Update instruction data
         instructionData = Buffer.concat([
           Buffer.from([0]), // Instruction (0 = Load)
           Buffer.from(new Uint32Array([offset]).buffer), // Write offset as 4 bytes
-          currentChunk, // 减小后的块数据
+          currentChunk, // Reduced chunk data
         ]);
         
-        // 重新计算估计大小
+        // Recalculate estimated size
         estimatedSize = instructionData.length + 300;
         
-        // 如果块太小，可能无法有效传输数据，此时应该报错
+        // If chunk is too small, it may not effectively transfer data, should throw an error
         if (currentChunk.length < 100) {
-          throw new Error(`无法将块大小减小到满足交易大小限制：当前大小 ${estimatedSize}，限制 1232`);
+          throw new Error(`Unable to reduce chunk size to meet transaction size limit: current size ${estimatedSize}, limit 1232`);
         }
       }
       
-      // 如果块大小已调整，记录最终大小
+      // If chunk size has been adjusted, record the final size
       if (currentChunk.length !== chunk.length) {
-        console.log(`已调整块大小从 ${chunk.length} 到 ${currentChunk.length} 字节`);
-        // 更新循环中使用的块，确保后续偏移量计算正确
+        console.log(`Adjusted chunk size from ${chunk.length} to ${currentChunk.length} bytes`);
+        // Update chunk used in the loop to ensure correct offset calculation for subsequent chunks
         chunk = currentChunk;
       }
 
@@ -272,9 +268,9 @@ async function deployProgram() {
     finalizeTransaction.recentBlockhash = (
       await connection.getLatestBlockhash()
     ).blockhash;
-    // BpfLoader.finalize 方法不存在，需要创建自定义指令
+    // BpfLoader.finalize method doesn't exist, need to create custom instruction
     const finalizeData = Buffer.alloc(4);
-    finalizeData.writeUInt32LE(1, 0); // 写入指令 (1 = Finalize)
+    finalizeData.writeUInt32LE(1, 0); // Write instruction (1 = Finalize)
 
     finalizeTransaction.add(
       new TransactionInstruction({
