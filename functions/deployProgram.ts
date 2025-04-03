@@ -19,6 +19,7 @@ import {
   FeeLevel,
 } from "../fireblocks/index";
 import fs from "fs";
+import { generateKeyPairSigner } from "gill";
 
 require("dotenv").config();
 
@@ -49,10 +50,12 @@ async function deployProgram() {
   console.log("Deployer account:", payerPublicKey.toBase58());
 
   // Create a new keypair for the program
+  const signer = await generateKeyPairSigner();
   const programKeypair = new Keypair({
-    publicKey: new PublicKey(process.env.PROGRAM_ID || "").toBytes(),
-    secretKey: new Uint8Array(64), // 空的私钥，因为我们只需要公钥
+    publicKey: new PublicKey(signer.address || "").toBytes(),
+    secretKey: new Uint8Array(64), 
   });
+  
   console.log("Program ID:", programKeypair.publicKey.toBase58());
 
   // Path to the compiled program (replace with your actual program path)
