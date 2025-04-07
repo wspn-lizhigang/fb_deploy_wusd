@@ -18,8 +18,7 @@ import {
   FireblocksConnectionAdapterConfig,
   FeeLevel,
 } from "../fireblocks/index";
-import fs from "fs";
-import { generateKeyPairSigner } from "gill";
+import fs from "fs"; 
 
 require("dotenv").config();
 
@@ -49,13 +48,8 @@ async function deployProgram() {
   const payerPublicKey = new PublicKey(connection.getAccount());
   console.log("Deployer account:", payerPublicKey.toBase58());
 
-  // Create a new keypair for the program
-  const signer = await generateKeyPairSigner();
-  const programKeypair = new Keypair({
-    publicKey: new PublicKey(signer.address || "").toBytes(),
-    secretKey: new Uint8Array(64), 
-  });
-  
+  // Create a new keypair for the program 
+  const programKeypair = Keypair.generate();  
   console.log("Program ID:", programKeypair.publicKey.toBase58());
 
   // Path to the compiled program (replace with your actual program path)
