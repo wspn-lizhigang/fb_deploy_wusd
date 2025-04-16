@@ -7,12 +7,8 @@ import {
   clusterApiUrl,
   SystemProgram,
   TransactionInstruction,
-} from "@solana/web3.js";
+} from "@solana/web3.js"; 
 
-// LoaderV4 is now the standard program loader
-const LOADER_V4_PROGRAM_ID = new PublicKey(
-  "LoaderV411111111111111111111111111111111111"
-);
 import {
   FireblocksConnectionAdapter,
   FireblocksConnectionAdapterConfig,
@@ -51,6 +47,10 @@ async function deployProgram() {
   // Create a new keypair for the program 
   const programKeypair = Keypair.generate();  
   console.log("Program ID:", programKeypair.publicKey.toBase58());
+
+  // Create a new keypair for the program account
+  const programAccountKeypair = Keypair.generate();
+  console.log("Program Account:", programAccountKeypair.publicKey.toBase58());
 
   // Path to the compiled program (replace with your actual program path)
   // Note: You need to compile your Solana program using the Solana CLI before running this script
@@ -102,17 +102,17 @@ async function deployProgram() {
     createAccountTransaction.add(
       SystemProgram.createAccount({
         fromPubkey: payerPublicKey,
-        newAccountPubkey: programKeypair.publicKey,
+        newAccountPubkey: programAccountKeypair.publicKey,
         lamports: minimumBalanceForRentExemption,
         space: programData.length,
-        programId: LOADER_V4_PROGRAM_ID,
+        programId: programKeypair.publicKey,
       })
     );
 
     // Sign and send the create account transaction
-    // Note: We need to sign with both the payer and the program keypair
-    // Since Fireblocks can only sign with the payer, we'll use partialSign for the program keypair
-    createAccountTransaction.partialSign(programKeypair);
+    // Note: We need to sign with both the payer and the program account keypair
+    // Since Fireblocks can only sign with the payer, we'll use partialSign for the program account keypair
+    createAccountTransaction.partialSign(programAccountKeypair);
 
     // Serialize the transaction with verifySignatures set to false
     const serializedTx = createAccountTransaction.serialize({
@@ -220,10 +220,10 @@ async function deployProgram() {
 
       chunkTransaction.add(
         new TransactionInstruction({
-          programId: LOADER_V4_PROGRAM_ID,
+          programId: programKeypair.publicKey,
           keys: [
             {
-              pubkey: programKeypair.publicKey,
+              pubkey: programAccountKeypair.publicKey,
               isSigner: true,
               isWritable: true,
             },
@@ -234,7 +234,7 @@ async function deployProgram() {
 
       try {
         console.log("Signing chunk transaction...");
-        chunkTransaction.partialSign(programKeypair);
+        chunkTransaction.partialSign(programAccountKeypair);
 
         const chunkTxHash = await sendAndConfirmTransaction(
           connection,
@@ -270,7 +270,7 @@ async function deployProgram() {
       new TransactionInstruction({
         keys: [
           {
-            pubkey: programKeypair.publicKey,
+            pubkey: programAccountKeypair.publicKey,
             isSigner: true,
             isWritable: true,
           },
@@ -282,7 +282,7 @@ async function deployProgram() {
             isWritable: false,
           },
         ],
-        programId: LOADER_V4_PROGRAM_ID,
+        programId: programKeypair.publicKey,
         data: finalizeData,
       })
     );
@@ -291,7 +291,7 @@ async function deployProgram() {
     let finalizeTxHash;
     try {
       console.log("Signing finalize transaction...");
-      finalizeTransaction.partialSign(programKeypair);
+      finalizeTransaction.partialSign(programAccountKeypair);
       console.log("Finalize transaction signed successfully");
 
       finalizeTxHash = await sendAndConfirmTransaction(
@@ -310,7 +310,7 @@ async function deployProgram() {
     console.log("Program deployment completed successfully!");
     console.log(`Program ID: ${programKeypair.publicKey.toBase58()}`);
     console.log(
-      `Verify your program at: https://explorer.solana.com/address/${programKeypair.publicKey.toBase58()}?cluster=devnet`
+      `Verify your program at: https://explorer.solana.com/address/${programAccountKeypair.publicKey.toBase58()}?cluster=devnet`
     );
   } catch (error) {
     console.error("Error deploying program:", error);
