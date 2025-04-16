@@ -7,14 +7,16 @@ import {
   clusterApiUrl,
   SystemProgram,
   TransactionInstruction,
-} from "@solana/web3.js"; 
+} from "@solana/web3.js";
+
+import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 
 import {
   FireblocksConnectionAdapter,
   FireblocksConnectionAdapterConfig,
   FeeLevel,
 } from "../fireblocks/index";
-import fs from "fs"; 
+import fs from "fs";
 
 require("dotenv").config();
 
@@ -44,8 +46,8 @@ async function deployProgram() {
   const payerPublicKey = new PublicKey(connection.getAccount());
   console.log("Deployer account:", payerPublicKey.toBase58());
 
-  // Create a new keypair for the program 
-  const programKeypair = Keypair.generate();  
+  // Create a new keypair for the program
+  const programKeypair = Keypair.generate();
   console.log("Program ID:", programKeypair.publicKey.toBase58());
 
   // Create a new keypair for the program account
@@ -105,7 +107,7 @@ async function deployProgram() {
         newAccountPubkey: programAccountKeypair.publicKey,
         lamports: minimumBalanceForRentExemption,
         space: programData.length,
-        programId: programKeypair.publicKey,
+        programId: TOKEN_2022_PROGRAM_ID,
       })
     );
 
@@ -143,22 +145,28 @@ async function deployProgram() {
       const INSTRUCTION_HEADER_SIZE = 5;
       // Additional safety margin
       const SAFETY_MARGIN = 150; // Increased safety margin
-      
+
       // Calculate maximum bytes available for data
-      const maxDataSize = MAX_TRANSACTION_SIZE - TRANSACTION_METADATA_SIZE - INSTRUCTION_HEADER_SIZE - SAFETY_MARGIN;
-      
+      const maxDataSize =
+        MAX_TRANSACTION_SIZE -
+        TRANSACTION_METADATA_SIZE -
+        INSTRUCTION_HEADER_SIZE -
+        SAFETY_MARGIN;
+
       // Set a very conservative initial chunk size
       let chunkSize = Math.min(maxDataSize, 600); // Reduced to 600 bytes
-      
+
       // Calculate total chunks needed with current chunk size
-      let totalChunks = Math.ceil(dataLength / chunkSize); 
-      
+      let totalChunks = Math.ceil(dataLength / chunkSize);
+
       return { chunkSize, totalChunks };
     };
-    
+
     // Dynamically calculate optimal chunk size
-    const { chunkSize, totalChunks } = calculateOptimalChunkSize(programData.length);
-    
+    const { chunkSize, totalChunks } = calculateOptimalChunkSize(
+      programData.length
+    );
+
     console.log(`Optimal chunk size: ${chunkSize} bytes`);
     console.log(`Total chunks needed: ${totalChunks}`);
     let chunkTxHash = ""; // Declare variable outside loop
@@ -187,40 +195,51 @@ async function deployProgram() {
 
       // Validate transaction size
       let estimatedSize = instructionData.length + 300; // Increase metadata estimate to ensure safety
-      
+
       // If estimated size exceeds limit, gradually reduce current chunk until size requirement is met
       while (estimatedSize > 1232) {
-        console.error(`Warning: Estimated transaction size (${estimatedSize}) approaching limit (1232), attempting to reduce chunk size`);
+        console.error(
+          `Warning: Estimated transaction size (${estimatedSize}) approaching limit (1232), attempting to reduce chunk size`
+        );
         // Reduce size by 10% each time
-        currentChunk = currentChunk.slice(0, Math.floor(currentChunk.length * 0.9));
-        console.log(`Reducing current chunk size to ${currentChunk.length} bytes and retrying`);
-        
+        currentChunk = currentChunk.slice(
+          0,
+          Math.floor(currentChunk.length * 0.9)
+        );
+        console.log(
+          `Reducing current chunk size to ${currentChunk.length} bytes and retrying`
+        );
+
         // Update instruction data
         instructionData = Buffer.concat([
           Buffer.from([0]), // Instruction (0 = Load)
           Buffer.from(new Uint32Array([offset]).buffer), // Write offset as 4 bytes
           currentChunk, // Reduced chunk data
         ]);
-        
+
         // Recalculate estimated size
         estimatedSize = instructionData.length + 300;
-        
+
         // If chunk is too small, it may not effectively transfer data, should throw an error
         if (currentChunk.length < 100) {
-          throw new Error(`Unable to reduce chunk size to meet transaction size limit: current size ${estimatedSize}, limit 1232`);
+          throw new Error(
+            `Unable to reduce chunk size to meet transaction size limit: current size ${estimatedSize}, limit 1232`
+          );
         }
       }
-      
+
       // If chunk size has been adjusted, record the final size
       if (currentChunk.length !== chunk.length) {
-        console.log(`Adjusted chunk size from ${chunk.length} to ${currentChunk.length} bytes`);
+        console.log(
+          `Adjusted chunk size from ${chunk.length} to ${currentChunk.length} bytes`
+        );
         // Update chunk used in the loop to ensure correct offset calculation for subsequent chunks
         chunk = currentChunk;
       }
 
       chunkTransaction.add(
         new TransactionInstruction({
-          programId: programKeypair.publicKey,
+          programId: TOKEN_2022_PROGRAM_ID,
           keys: [
             {
               pubkey: programAccountKeypair.publicKey,
@@ -282,7 +301,7 @@ async function deployProgram() {
             isWritable: false,
           },
         ],
-        programId: programKeypair.publicKey,
+        programId: TOKEN_2022_PROGRAM_ID,
         data: finalizeData,
       })
     );
