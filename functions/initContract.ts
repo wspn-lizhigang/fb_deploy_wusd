@@ -1,6 +1,5 @@
 import {
   Keypair,
-  LAMPORTS_PER_SOL,
   PublicKey,
   sendAndConfirmTransaction,
   Transaction,
@@ -13,18 +12,14 @@ import {
   FireblocksConnectionAdapterConfig,
   FeeLevel,
 } from "../fireblocks/index";
-import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
-import * as fs from "fs";
+import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token"; 
 
 require("dotenv").config();
 
 const InitContract = async () => {
   console.log("Starting contract initialization...");
-
   // 设置程序ID
-  const programId = new PublicKey(
-    "DcwqLAaLEzgRvpQB62XSr9e4pWvvnBJQjeBenBGNVHPP"
-  );
+  const programId = new PublicKey(process.env.WUSD_PROGRAM_ID || "");
 
   // 配置Fireblocks连接
   const fireblocksConnectionConfig: FireblocksConnectionAdapterConfig = {
@@ -47,10 +42,8 @@ const InitContract = async () => {
   console.log("Admin account:", admin.toBase58());
 
   // 创建铸币者和暂停者的密钥对
-  const minter = "412raCGpo1GHe9YK9qdHgAC6Pktj7DtYMhrCrSry4MrU";
-  const pauser = "7R8xfz2YiYBdwwjyEF166jZUU4fXj1D9BoqoPwDSiUtu";
-  const minterPublicKey = new PublicKey(minter);
-  const pauserPublicKey = new PublicKey(pauser);
+  const minterPublicKey = new PublicKey(process.env.WUSD_MINTER_ADDRESS || "");
+  const pauserPublicKey = new PublicKey(process.env.WUSD_PAUSER_ADDRESS || "");
   console.log("Minter account:", minterPublicKey.toBase58());
   console.log("Pauser account:", pauserPublicKey.toBase58());
 
@@ -60,7 +53,7 @@ const InitContract = async () => {
 
   // 计算PDA地址
   const authorityState = PublicKey.findProgramAddressSync(
-    [Buffer.from("authority"), admin.toBuffer()],
+    [Buffer.from("authority"), tokenMint.publicKey.toBuffer()],
     programId
   )[0];
 
@@ -70,13 +63,20 @@ const InitContract = async () => {
   )[0];
 
   const pauseState = PublicKey.findProgramAddressSync(
-    [Buffer.from("pause_state"), pauserPublicKey.toBuffer()],
+    [Buffer.from("pause_state"), tokenMint.publicKey.toBuffer()],
+    programId
+  )[0];
+
+  // 计算freezeState的PDA地址
+  const freezeState = PublicKey.findProgramAddressSync(
+    [Buffer.from("freeze_state"), tokenMint.publicKey.toBuffer()],
     programId
   )[0];
 
   console.log("Authority state:", authorityState.toBase58());
   console.log("Mint state:", mintState.toBase58());
   console.log("Pause state:", pauseState.toBase58());
+  console.log("Freeze state:", freezeState.toBase58());
 
   // 设置代币小数位数
   const decimals = 6;
@@ -129,6 +129,49 @@ const InitContract = async () => {
     console.log(
       `Transaction: https://explorer.solana.com/tx/${signature}?cluster=devnet`
     );
+    
+    // 初始化freezeState账户
+    console.log("Initializing freeze state...");
+    
+    // 创建一个假的recipientTokenAccount，因为在示例代码中需要这个账户
+    // 在实际使用中，这应该是一个真实的代币账户
+    const recipientTokenAccount = Keypair.generate().publicKey;
+    
+    // 创建初始化freezeState的指令
+    const initializeFreezeStateIx = new TransactionInstruction({
+      keys: [
+        { pubkey: admin, isSigner: true, isWritable: true },
+        { pubkey: authorityState, isSigner: false, isWritable: false },
+        { pubkey: tokenMint.publicKey, isSigner: false, isWritable: false },
+        { pubkey: freezeState, isSigner: false, isWritable: true },
+        { pubkey: recipientTokenAccount, isSigner: false, isWritable: false },
+        { pubkey: admin, isSigner: true, isWritable: true }, // payer
+        { pubkey: TOKEN_2022_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      programId: programId,
+      data: Buffer.from(Uint8Array.of(1)) // 1表示initializeFreezeState指令
+    });
+    
+    // 创建新的交易
+    const freezeTransaction = new Transaction();
+    freezeTransaction.add(initializeFreezeStateIx);
+    freezeTransaction.feePayer = admin;
+    freezeTransaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    
+    // 发送并确认交易
+    console.log("Sending initializeFreezeState transaction...");
+    const freezeSignature = await sendAndConfirmTransaction(
+      connection,
+      freezeTransaction,
+      [] // Fireblocks已经处理admin的签名，不需要额外的签名者
+    );
+    
+    console.log("Freeze state initialized successfully!");
+    console.log(
+      `Transaction: https://explorer.solana.com/tx/${freezeSignature}?cluster=devnet`
+    );
+    
     return signature;
   } catch (error) {
     console.error("Error initializing contract:", error);

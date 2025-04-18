@@ -5,6 +5,7 @@
   "scripts": {
     "deploy": "npx ts-node functions/deployProgram.ts",
     "initca": "npx ts-node functions/initContract.ts",
+    "accounts": "npx ts-node functions/getAccount.ts",
     "mint": "npx ts-node functions/mintToken.ts"
   },
   "author": "",
