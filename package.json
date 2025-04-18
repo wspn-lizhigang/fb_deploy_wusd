@@ -4,6 +4,7 @@
   "description": "Solana Web3.js Fireblocks compatible provider",
   "scripts": {
     "deploy": "npx ts-node functions/deployProgram.ts",
+    "initca": "npx ts-node functions/initContract.ts",
     "mint": "npx ts-node functions/mintToken.ts"
   },
   "author": "",
