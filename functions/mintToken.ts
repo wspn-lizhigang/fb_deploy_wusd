@@ -30,7 +30,7 @@ const mintToken = async () => {
   const fireblocksConnectionConfig: FireblocksConnectionAdapterConfig = {
     apiKey: process.env.FIREBLOCKS_API_KEY || "",
     apiSecretPath: process.env.FIREBLOCKS_SECRET_KEY_PATH || "",
-    vaultAccountId: process.env.FIREBLOCKS_VAULT_ACCOUNT_ID || "",
+    vaultAccountId: process.env.MINTER_VAULT_ACCOUNT_ID || "",
     feeLevel: FeeLevel.HIGH, // 使用高费用级别进行铸币交易
     silent: false,
     devnet: true, // 设置为true表示devnet，false表示mainnet
@@ -43,7 +43,7 @@ const mintToken = async () => {
   );
 
   // 获取铸币者的公钥
-  const minter = new PublicKey(process.env.WUSD_MINTER_ADDRESS || "");
+  const minter = new PublicKey(connection.getAccount());
   console.log("Minter account:", minter.toBase58());
   console.log("Recipient token account:", recipientTokenAccount.toBase58());
 

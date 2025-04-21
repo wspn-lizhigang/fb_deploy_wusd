@@ -25,7 +25,7 @@ const InitContract = async () => {
   const fireblocksConnectionConfig: FireblocksConnectionAdapterConfig = {
     apiKey: process.env.FIREBLOCKS_API_KEY || "",
     apiSecretPath: process.env.FIREBLOCKS_SECRET_KEY_PATH || "",
-    vaultAccountId: process.env.FIREBLOCKS_VAULT_ACCOUNT_ID || "",
+    vaultAccountId: process.env.ADMIN_VAULT_ACCOUNT_ID || "",
     feeLevel: FeeLevel.HIGH, // 使用高费用级别进行部署交易
     silent: false,
     devnet: true, // 设置为true表示devnet，false表示mainnet

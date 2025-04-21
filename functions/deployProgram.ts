@@ -2,7 +2,7 @@
  * @Author: 李志刚
  * @Date: 2025-04-10 15:13:39
  * @LastEditors: 李志刚
- * @LastEditTime: 2025-04-18 16:58:08
+ * @LastEditTime: 2025-04-21 13:06:25
  * @Description: 
  */
 import {
@@ -37,7 +37,7 @@ async function deployProgram() {
   const fireblocksConnectionConfig: FireblocksConnectionAdapterConfig = {
     apiKey: process.env.FIREBLOCKS_API_KEY || "",
     apiSecretPath: process.env.FIREBLOCKS_SECRET_KEY_PATH || "",
-    vaultAccountId: process.env.FIREBLOCKS_VAULT_ACCOUNT_ID || "",
+    vaultAccountId: process.env.ADMIN_VAULT_ACCOUNT_ID || "",
     feeLevel: FeeLevel.HIGH, // Use high fee level for deployment transactions
     silent: false,
     devnet: true, // Set to true for devnet, false for mainnet
