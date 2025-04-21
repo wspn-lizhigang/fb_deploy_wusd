@@ -48,28 +48,47 @@ const InitContract = async () => {
   console.log("Pauser account:", pauserPublicKey.toBase58());
 
   // 创建代币铸造密钥对
-  const tokenMint = Keypair.generate();
-  console.log("Token mint:", tokenMint.publicKey.toBase58());
+  // 从环境变量或文件中加载tokenMint的密钥对
+  // 注意：需要从文件中加载密钥对，而不是仅使用公钥
+  let tokenMintKeypair;
+  try {
+    // 尝试从文件中加载密钥对
+    const keypairFile = process.env.WUSD_TOKENMINT_KEYPAIR_PATH || "";
+    if (keypairFile) {
+      const keypairData = require('fs').readFileSync(keypairFile, 'utf8');
+      tokenMintKeypair = Keypair.fromSecretKey(
+        Buffer.from(JSON.parse(keypairData))
+      );
+    } else {
+      throw new Error("No keypair file path provided");
+    }
+  } catch (error) {
+    console.error("Failed to load tokenMint keypair:", error);
+    throw error;
+  }
+  
+  const tokenMint = tokenMintKeypair.publicKey;
+  console.log("Token mint:", tokenMint.toBase58());
 
   // 计算PDA地址
   const authorityState = PublicKey.findProgramAddressSync(
-    [Buffer.from("authority"), tokenMint.publicKey.toBuffer()],
+    [Buffer.from("authority"), tokenMint.toBuffer()],
     programId
   )[0];
 
   const mintState = PublicKey.findProgramAddressSync(
-    [Buffer.from("mint_state"), tokenMint.publicKey.toBuffer()],
+    [Buffer.from("mint_state"), tokenMint.toBuffer()],
     programId
   )[0];
 
   const pauseState = PublicKey.findProgramAddressSync(
-    [Buffer.from("pause_state"), tokenMint.publicKey.toBuffer()],
+    [Buffer.from("pause_state"), tokenMint.toBuffer()],
     programId
   )[0];
 
   // 计算freezeState的PDA地址
   const freezeState = PublicKey.findProgramAddressSync(
-    [Buffer.from("freeze_state"), tokenMint.publicKey.toBuffer()],
+    [Buffer.from("freeze_state"), tokenMint.toBuffer()],
     programId
   )[0];
 
@@ -87,7 +106,7 @@ const InitContract = async () => {
       { pubkey: admin, isSigner: true, isWritable: true },
       { pubkey: minterPublicKey, isSigner: false, isWritable: false },
       { pubkey: pauserPublicKey, isSigner: false, isWritable: false },
-      { pubkey: tokenMint.publicKey, isSigner: true, isWritable: true },
+      { pubkey: tokenMint, isSigner: true, isWritable: true },
       { pubkey: authorityState, isSigner: false, isWritable: true },
       { pubkey: mintState, isSigner: false, isWritable: true },
       { pubkey: pauseState, isSigner: false, isWritable: true },
@@ -113,8 +132,8 @@ const InitContract = async () => {
     await connection.getLatestBlockhash()
   ).blockhash;
 
-  // 部分签名（由tokenMint签名）
-  transaction.partialSign(tokenMint);
+  // 部分签名（由tokenMint密钥对签名）
+  transaction.partialSign(tokenMintKeypair);
 
   try {
     // 发送并确认交易
@@ -142,7 +161,7 @@ const InitContract = async () => {
       keys: [
         { pubkey: admin, isSigner: true, isWritable: true },
         { pubkey: authorityState, isSigner: false, isWritable: false },
-        { pubkey: tokenMint.publicKey, isSigner: false, isWritable: false },
+        { pubkey: tokenMint, isSigner: false, isWritable: false },
         { pubkey: freezeState, isSigner: false, isWritable: true },
         { pubkey: recipientTokenAccount, isSigner: false, isWritable: false },
         { pubkey: admin, isSigner: true, isWritable: true }, // payer

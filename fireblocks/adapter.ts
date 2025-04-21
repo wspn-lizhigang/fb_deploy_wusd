@@ -191,7 +191,7 @@ export class FireblocksConnectionAdapter extends Connection {
    */
   public getAccount = (): string => {
     return this.account;
-  };
+  }; 
 
   private async signWithFireblocks(
     transaction: TransactionOrVersionedTransaction

@@ -9,7 +9,7 @@ import {
   FireblocksConnectionAdapter,
   FireblocksConnectionAdapterConfig,
   FeeLevel,
-} from "../fireblocks/index";
+} from "../fireblocks/index"; 
 
 require("dotenv").config();
 const getAccount = async () => {
@@ -27,7 +27,7 @@ const getAccount = async () => {
   const connection = await FireblocksConnectionAdapter.create(
     clusterApiUrl("devnet"),
     fireblocksConnectionConfig
-  );
+  ); 
   const sourcePublicKey = new PublicKey(connection.getAccount());
   const tokenAccounts = await connection.getTokenAccountsByOwner(
     sourcePublicKey,
