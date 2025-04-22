@@ -12,14 +12,14 @@ import {
   FireblocksConnectionAdapterConfig,
   FeeLevel,
 } from "../fireblocks/index";
-import { TOKEN_2022_PROGRAM_ID, getAccount } from "@solana/spl-token";
+import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import BN from "bn.js";
 
 require("dotenv").config();
 
 const mintToken = async () => {
   const amount = new BN(10000000000000); // 10000000 WUSD (考虑到6位小数)
-  const recipientTokenAccount = new PublicKey(
+  let recipientTokenAccount = new PublicKey( // 将 const 改为 let
     process.env.WUSD_RECIPIENT_ADDRESS || ""
   );
   console.log("Starting token minting process...");
@@ -110,46 +110,6 @@ const mintToken = async () => {
     "WUSD"
   );
 
-  // 铸币前检查代币账户余额
-  try {
-    console.log("Checking recipient token account balance before minting...");
-    // 使用getTokenAccountsByOwner获取所有token账户
-    const tokenAccounts = await connection.getTokenAccountsByOwner(
-      new PublicKey(process.env.WUSD_RECIPIENT_OWNER || ""),
-      { mint: tokenMint }
-    );
-    
-    console.log(`Found ${tokenAccounts.value.length} token accounts for this mint`);
-    
-    // 查找匹配的token账户
-    let found = false;
-    for (const tokenAccount of tokenAccounts.value) {
-      if (tokenAccount.pubkey.equals(recipientTokenAccount)) {
-        found = true;
-        try {
-          const accountInfo = await getAccount(
-            connection,
-            recipientTokenAccount,
-            undefined,
-            TOKEN_2022_PROGRAM_ID
-          );
-          console.log("Recipient token account exists");
-          console.log("Current balance:", accountInfo.amount.toString());
-        } catch (accountError) {
-          console.log("Found token account but couldn't get details:", accountError);
-        }
-        break;
-      }
-    }
-    
-    if (!found) {
-      console.log("Recipient token account not found among owner's accounts");
-    }
-  } catch (error) {
-    console.log("Error checking recipient token account:");
-    console.log("Error details:", error);
-  }
-
   // 创建铸币指令
   const mintIx = new TransactionInstruction({
     keys: [
@@ -192,48 +152,6 @@ const mintToken = async () => {
     console.log(
       `Transaction: https://explorer.solana.com/tx/${signature}?cluster=devnet`
     );
-
-    // 铸币后检查代币账户余额
-    try {
-      console.log("Checking recipient token account balance after minting...");
-      // 使用getTokenAccountsByOwner获取所有token账户
-      const tokenAccounts = await connection.getTokenAccountsByOwner(
-        new PublicKey(process.env.WUSD_RECIPIENT_OWNER || ""),
-        { mint: tokenMint }
-      );
-      
-      console.log(`Found ${tokenAccounts.value.length} token accounts for this mint`);
-      
-      // 查找匹配的token账户
-      let found = false;
-      for (const tokenAccount of tokenAccounts.value) {
-        if (tokenAccount.pubkey.equals(recipientTokenAccount)) {
-          found = true;
-          const accountInfo = await getAccount(
-            connection,
-            recipientTokenAccount,
-            undefined,
-            TOKEN_2022_PROGRAM_ID
-          );
-          console.log("Updated balance:", accountInfo.amount.toString());
-          console.log(
-            "Tokens in WUSD:",
-            new BN(accountInfo.amount.toString())
-              .div(new BN(10 ** decimals))
-              .toString()
-          );
-          break;
-        }
-      }
-      
-      if (!found) {
-        console.log("Recipient token account not found among owner's accounts after minting");
-      }
-    } catch (error) {
-      console.log("Failed to get updated token account balance");
-      console.log("Error details:", error);
-    }
-
     return signature;
   } catch (error) {
     console.error("Error minting tokens:", error);
